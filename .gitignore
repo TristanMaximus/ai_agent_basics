@@ -11,3 +11,4 @@ wheels/
 
 #Project Files (configs, secrets etc.)
 .env
+*lorem.txt
