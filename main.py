@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from google import genai
 import argparse
 from google.genai import types
+from prompts import system_prompt
+from call_function import available_functions
 
 def main():
     parser = argparse.ArgumentParser(description="Chatbot")
@@ -19,7 +21,15 @@ def main():
     if api_key == None:
         raise RuntimeError("Error: Google Gemini API Key is not present!")
     gemini_client = genai.Client(api_key = api_key)
-    gemini_response = gemini_client.models.generate_content(model="gemini-2.5-flash", contents = messages)
+    gemini_response = gemini_client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents = messages,
+        config = types.GenerateContentConfig(
+            tools = [available_functions],
+            system_instruction = system_prompt,
+            temperature = 0
+        )
+    )
     usage_metadata = gemini_response.usage_metadata
     if usage_metadata != None:
         if args.verbose:
@@ -27,7 +37,13 @@ def main():
             print(f"Response tokens: {usage_metadata.candidates_token_count}")
     else:
         raise RuntimeError("Error: No Usage Metadata in Gemini response.")
-    print(gemini_response.text)
+
+    if gemini_response.function_calls != None:
+        for function_call in gemini_response.function_calls:
+            print(function_call)
+            print(f"Calling function: {function_call.name}({function_call.args})")
+    else:
+        print(gemini_response.text)
 
 
 if __name__ == "__main__":
