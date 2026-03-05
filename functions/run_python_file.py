@@ -1,5 +1,30 @@
 import os
 import subprocess
+from google.genai import types
+
+# Function Declaration (or schema) for the LLM. We tell the LLM about functions we provide and how to use them
+schema_run_python_file = types.FunctionDeclaration(
+    name="run_python_file",
+    description="Executes code inside a python file (runs a python file) on the path relative to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="Path to a python file to be executed. Path is relative to the working directory.",
+            ),
+            "args": types.Schema(
+                type=types.Type.ARRAY,
+                description="Array/List of arguments to pass to the python file to run against.",
+                items=types.Schema(
+                    type=types.Type.STRING,
+                    description="Argument to pass to the python file."
+                )
+            )
+        },
+        required=["file_path"]
+    ),
+)
 
 def run_python_file(working_directory, file_path, args=None):
     try:

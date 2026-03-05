@@ -10,7 +10,7 @@ schema_get_files_info = types.FunctionDeclaration(
         properties={
             "directory": types.Schema(
                 type=types.Type.STRING,
-                description="Directory path to list files from, relative to the working directory (default is the working directory itself). In case user asks about root, it is just a '.', meaning root of the working directory. Explicitly state root as '.'",
+                description="Directory path to list files from, relative to the working directory (default is the working directory itself). In case user asks about root, it is just a '.', meaning root of the working directory. Explicitly state root as '.'.",
             ),
         },
     ),

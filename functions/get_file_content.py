@@ -1,5 +1,22 @@
 import os
 from config import MAX_CHARS
+from google.genai import types
+
+# Function Declaration (or schema) for the LLM. We tell the LLM about functions we provide and how to use them
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description=f"Get contents of a an existing file located on the path relative to the working directory. Returns full contents if file contains less that {MAX_CHARS} characters. Truncated otherwise.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="Path to a file to get content from, relative to the working directory.",
+            ),
+        },
+        required=["file_path"]
+    ),
+)
 
 def get_file_content(working_directory, file_path):
     try:
