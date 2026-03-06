@@ -4,7 +4,7 @@ from google import genai
 import argparse
 from google.genai import types
 from prompts import system_prompt
-from call_function import available_functions
+from call_function import available_functions, call_function
 
 def main():
     parser = argparse.ArgumentParser(description="Chatbot")
@@ -12,6 +12,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     args = parser.parse_args()
     # Now we can access `args.user_prompt`
+    verbose = args.verbose
     if args.verbose:
         print(f"User prompt: {args.user_prompt}")
     messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
@@ -38,10 +39,25 @@ def main():
     else:
         raise RuntimeError("Error: No Usage Metadata in Gemini response.")
 
+    function_results = list()
     if gemini_response.function_calls != None:
         for function_call in gemini_response.function_calls:
+            # printing info about a function that LLM decided to call
             print(function_call)
             print(f"Calling function: {function_call.name}({function_call.args})")
+
+            # actually calling function and processing result
+            function_call_result = call_function(function_call)
+            if len(function_call_result.parts) == 0:
+                raise RuntimeError(f"Error: something went wrong during the function call (no parts): {function_call.name}({function_call.args})")
+            actual_func_response = function_call_result.parts[0].function_response
+            if actual_func_response is None:
+                raise RuntimeError(f"Error: something went wrong during the function call (no function response object): {function_call.name}({function_call.args})")
+            if actual_func_response.response is None:
+                raise RuntimeError(f"Error: something went wrong during the function call (no response in function response object): {function_call.name}({function_call.args})")
+            function_results.append(function_call_result.parts[0])
+            if args.verbose:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
     else:
         print(gemini_response.text)
 
