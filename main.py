@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 from google import genai
 import argparse
@@ -22,7 +23,15 @@ def main():
     if api_key == None:
         raise RuntimeError("Error: Google Gemini API Key is not present!")
     gemini_client = genai.Client(api_key = api_key)
-    gemini_response = gemini_client.models.generate_content(
+
+    for _ in range(20):
+        if generate_content(gemini_client, messages, args.verbose):
+            sys.exit()
+    sys.exit(1)
+
+
+def generate_content(client, messages, verbose):
+    gemini_response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents = messages,
         config = types.GenerateContentConfig(
@@ -33,33 +42,46 @@ def main():
     )
     usage_metadata = gemini_response.usage_metadata
     if usage_metadata != None:
-        if args.verbose:
+        if verbose:
             print(f"Prompt tokens: {usage_metadata.prompt_token_count}")
             print(f"Response tokens: {usage_metadata.candidates_token_count}")
     else:
         raise RuntimeError("Error: No Usage Metadata in Gemini response.")
 
-    function_results = list()
-    if gemini_response.function_calls != None:
-        for function_call in gemini_response.function_calls:
-            # printing info about a function that LLM decided to call
-            print(function_call)
-            print(f"Calling function: {function_call.name}({function_call.args})")
+    # checking candidates and appending them if present to messages, to make sure model is aware of previous responses and uses them
+    if gemini_response.candidates is not None:
+        for candidate in gemini_response.candidates:
+            messages.append(candidate.content)
 
-            # actually calling function and processing result
-            function_call_result = call_function(function_call)
-            if len(function_call_result.parts) == 0:
-                raise RuntimeError(f"Error: something went wrong during the function call (no parts): {function_call.name}({function_call.args})")
-            actual_func_response = function_call_result.parts[0].function_response
-            if actual_func_response is None:
-                raise RuntimeError(f"Error: something went wrong during the function call (no function response object): {function_call.name}({function_call.args})")
-            if actual_func_response.response is None:
-                raise RuntimeError(f"Error: something went wrong during the function call (no response in function response object): {function_call.name}({function_call.args})")
-            function_results.append(function_call_result.parts[0])
-            if args.verbose:
-                print(f"-> {function_call_result.parts[0].function_response.response}")
-    else:
+    if not gemini_response.function_calls:
+        print("Response:")
         print(gemini_response.text)
+        return True
+
+    function_results = list()
+    for function_call in gemini_response.function_calls:
+        # printing info about a function that LLM decided to call
+        print(f"Calling function: {function_call.name}({function_call.args})")
+
+        # actually calling function and processing result
+        function_call_result = call_function(function_call)
+
+        # handling bad results
+        if (
+            not function_call_result.parts
+            or not function_call_result.parts[0].function_response
+            or not function_call_result.parts[0].function_response.response
+        ):
+            raise RuntimeError(f"Empty function response for {function_call.name}")
+
+        if verbose:
+            print(f"-> {function_call_result.parts[0].function_response.response}")
+
+        function_results.append(function_call_result.parts[0])
+
+    # after functions executed, append functions results to the messages for model to be aware of them on subsequent iterations
+    messages.append(types.Content(role="user", parts=function_results))
+    return False
 
 
 if __name__ == "__main__":
